@@ -6,8 +6,10 @@ services:
     volumes:
       - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - frontend
-      - backend
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
 
   frontend:
     build:
@@ -15,20 +17,25 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost/api/v1
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 
   backend:
     build:
       context: ./backend
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://language_user:language_pass@pgbouncer:6432/language_ai
+      DATABASE_URL: postgresql+asyncpg://language_user:language_pass@postgres:5432/language_ai
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: '["http://localhost", "http://localhost:3000"]'
     depends_on:
-      - pgbouncer
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   worker:
     build:
@@ -37,11 +44,13 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://language_user:language_pass@pgbouncer:6432/language_ai
+      DATABASE_URL: postgresql+asyncpg://language_user:language_pass@postgres:5432/language_ai
       REDIS_URL: redis://redis:6379/0
     depends_on:
-      - backend
-      - redis
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -54,9 +63,14 @@ services:
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U language_user -d language_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   pgbouncer:
-    image: edoburu/pgbouncer:1.23.1-p1
+    image: edoburu/pgbouncer:latest
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -69,7 +83,8 @@ services:
     ports:
       - "6432:6432"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   redis:
     image: redis:7.4-alpine
@@ -78,6 +93,11 @@ services:
       - redis_data:/data
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   prometheus:
     image: prom/prometheus:v3.0.1
@@ -86,7 +106,8 @@ services:
     ports:
       - "9090:9090"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 
 volumes:
   postgres_data:

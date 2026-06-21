@@ -12,6 +12,12 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     mode: str = "text"
     voice_enabled: bool = False
+    scenario_id: str | None = None
+    skill_ids: list[str] = []
+    custom_scenario: str | None = Field(default=None, max_length=240)
+    custom_skills: str | None = Field(default=None, max_length=400)
+    voice_preset_id: str | None = None
+    voice_speed: float | None = Field(default=None, ge=0.5, le=1.6)
 
 
 class PedagogicalFeedback(BaseModel):

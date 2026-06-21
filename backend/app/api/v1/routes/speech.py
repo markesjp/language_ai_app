@@ -15,5 +15,17 @@ async def stt(audio: UploadFile = File(...)) -> dict:
 @router.post("/tts")
 async def tts(payload: dict) -> dict:
     provider = MockTtsProvider()
-    audio, usage = await provider.synthesize(str(payload.get("text", "")), payload.get("voice"))
-    return {"audio_base64": "", "bytes": len(audio), "usage": usage.__dict__}
+    audio, usage = await provider.synthesize(
+        str(payload.get("text", "")),
+        payload.get("voice"),
+        payload.get("model"),
+        payload.get("speed"),
+    )
+    return {
+        "audio_base64": "",
+        "bytes": len(audio),
+        "preset_id": payload.get("preset_id"),
+        "voice": payload.get("voice"),
+        "speed": payload.get("speed"),
+        "usage": usage.__dict__,
+    }

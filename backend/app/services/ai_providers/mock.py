@@ -8,7 +8,7 @@ class MockLlmProvider(LlmProvider):
     name = "mock"
     model = "mock-teacher-001"
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> LlmResult:
+    async def complete(self, system_prompt: str, user_prompt: str, max_output_tokens: int | None = None) -> LlmResult:
         input_tokens = max(1, (len(system_prompt) + len(user_prompt)) // 4)
         answer = (
             "Claro! Vamos praticar juntos. "

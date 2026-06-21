@@ -45,19 +45,38 @@ class RagVectorStore:
 
         chunks = chunk_text(content)
         for index, chunk in enumerate(chunks):
+            embedding = await self.embeddings.embed(chunk)
+            vector = embedding if len(embedding) == 64 else None
             self.session.add(
                 RagChunk(
                     document_id=document.id,
                     domain=domain,
                     content=chunk,
                     metadata_json={**metadata, "chunk_index": index, "title": title, "source_uri": source_uri},
-                    embedding_json=await self.embeddings.embed(chunk),
+                    embedding_json=embedding,
+                    embedding_vector=vector,
                 )
             )
         return document.id, len(chunks)
 
     async def search(self, *, domain: str, query: str, limit: int = 5) -> list[tuple[RagChunk, float]]:
+        existing_chunk = await self.session.scalar(select(RagChunk.id).where(RagChunk.domain == domain).limit(1))
+        if not existing_chunk:
+            return []
+
         query_embedding = await self.embeddings.embed(query)
+        if self.session.bind and self.session.bind.dialect.name == "postgresql" and len(query_embedding) == 64:
+            distance = RagChunk.embedding_vector.cosine_distance(query_embedding)
+            result = await self.session.execute(
+                select(RagChunk, distance.label("distance"))
+                .where(RagChunk.domain == domain, RagChunk.embedding_vector.is_not(None))
+                .order_by(distance)
+                .limit(limit)
+            )
+            rows = result.all()
+            if rows:
+                return [(chunk, max(0, min(1, 1 - float(distance)))) for chunk, distance in rows]
+
         result = await self.session.execute(select(RagChunk).where(RagChunk.domain == domain))
         scored = [
             (chunk, cosine_similarity(query_embedding, chunk.embedding_json))

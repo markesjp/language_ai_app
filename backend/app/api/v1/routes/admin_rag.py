@@ -6,14 +6,16 @@ from app.core.observability import LatencyTracker, TraceContext, timed_step
 from app.db.session import get_session
 from app.schemas.common import UsageSummary
 from app.schemas.rag import AdminRagAnswer, AdminRagQuestion, DocumentIngestRequest, DocumentIngestResponse
+from app.services.rbac import require_permission
 from app.services.ai_providers.router import provider_router
 from app.services.audit.ledger import record_llm_usage
 from app.services.rag.vector_store import RagVectorStore, citation_from_chunk
+from app.services.runtime_settings import get_runtime_bool
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_permission("admin.rag:read"))])
 
 
-@router.post("/documents", response_model=DocumentIngestResponse)
+@router.post("/documents", response_model=DocumentIngestResponse, dependencies=[Depends(require_permission("admin.rag:write"))])
 async def ingest_document(
     payload: DocumentIngestRequest,
     session: AsyncSession = Depends(get_session),
@@ -31,7 +33,7 @@ async def ingest_document(
     return DocumentIngestResponse(document_id=document_id, chunks_indexed=chunks_indexed)
 
 
-@router.post("/ask", response_model=AdminRagAnswer)
+@router.post("/ask", response_model=AdminRagAnswer, dependencies=[Depends(require_permission("admin.rag:write"))])
 async def ask_admin_rag(
     payload: AdminRagQuestion,
     session: AsyncSession = Depends(get_session),
@@ -46,10 +48,11 @@ async def ask_admin_rag(
 
     citations = [citation_from_chunk(chunk, score) for chunk, score in matches if score > 0.35]
     evidence = "\n\n".join(chunk.content for chunk, score in matches if score > 0.35)
+    allow_pii = get_runtime_bool("admin_rag_allow_operational_pii", settings.admin_rag_allow_operational_pii)
     guardrail = (
         "Responda apenas usando documentos indexados e analytics agregados. "
         "Não tente consultar PII, conversas privadas ou banco operacional de usuários. "
-        f"Admin RAG pode acessar PII? {settings.admin_rag_allow_operational_pii}."
+        f"Admin RAG pode acessar PII? {allow_pii}."
     )
     prompt = (
         f"Pergunta: {payload.question}\n"

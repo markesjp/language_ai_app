@@ -23,5 +23,11 @@ class MockTtsProvider:
     name = "mock"
     model = "mock-tts-001"
 
-    async def synthesize(self, text: str, voice: str | None = None) -> tuple[bytes, SpeechUsage]:
-        return b"", SpeechUsage(provider=self.name, model=self.model, tts_characters=len(text))
+    async def synthesize(
+        self,
+        text: str,
+        voice: str | None = None,
+        model: str | None = None,
+        speed: float | None = None,
+    ) -> tuple[bytes, SpeechUsage]:
+        return b"", SpeechUsage(provider=self.name, model=model or self.model, tts_characters=len(text))

@@ -23,7 +23,7 @@ class LlmProvider(ABC):
     model: str
 
     @abstractmethod
-    async def complete(self, system_prompt: str, user_prompt: str) -> LlmResult:
+    async def complete(self, system_prompt: str, user_prompt: str, max_output_tokens: int | None = None) -> LlmResult:
         raise NotImplementedError
 
 
