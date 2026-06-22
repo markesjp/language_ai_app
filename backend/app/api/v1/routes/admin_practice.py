@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_session
-from app.models import PracticeScenario, PracticeSkill, VoicePreset
+from app.models import PracticeScenario, PracticeSkill, VoicePersonality, VoicePreset
 from app.schemas.practice import (
     PracticeScenarioCreate,
     PracticeScenarioRead,
@@ -15,6 +15,9 @@ from app.schemas.practice import (
     VoicePresetCreate,
     VoicePresetRead,
     VoicePresetUpdate,
+    VoicePersonalityCreate,
+    VoicePersonalityRead,
+    VoicePersonalityUpdate,
 )
 from app.services.rbac import require_permission
 
@@ -44,6 +47,13 @@ async def _get_voice_preset(session: AsyncSession, preset_id: str) -> VoicePrese
     if not preset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice preset not found")
     return preset
+
+
+async def _get_voice_personality(session: AsyncSession, personality_id: str) -> VoicePersonality:
+    personality = await session.get(VoicePersonality, personality_id)
+    if not personality:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voice personality not found")
+    return personality
 
 
 async def _load_skills(session: AsyncSession, skill_ids: list[str]) -> list[PracticeSkill]:
@@ -191,3 +201,44 @@ async def delete_voice_preset(preset_id: str, session: AsyncSession = Depends(ge
     await session.commit()
     await session.refresh(preset)
     return preset
+
+
+@router.get("/voice-personalities", response_model=list[VoicePersonalityRead])
+async def list_voice_personalities(session: AsyncSession = Depends(get_session)) -> list[VoicePersonality]:
+    result = await session.execute(select(VoicePersonality).order_by(VoicePersonality.gender, VoicePersonality.name))
+    return list(result.scalars().all())
+
+
+@router.post("/voice-personalities", response_model=VoicePersonalityRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("admin.catalog:write"))])
+async def create_voice_personality(
+    payload: VoicePersonalityCreate,
+    session: AsyncSession = Depends(get_session),
+) -> VoicePersonality:
+    personality = VoicePersonality(**payload.model_dump())
+    session.add(personality)
+    await session.commit()
+    await session.refresh(personality)
+    return personality
+
+
+@router.put("/voice-personalities/{personality_id}", response_model=VoicePersonalityRead, dependencies=[Depends(require_permission("admin.catalog:write"))])
+async def update_voice_personality(
+    personality_id: str,
+    payload: VoicePersonalityUpdate,
+    session: AsyncSession = Depends(get_session),
+) -> VoicePersonality:
+    personality = await _get_voice_personality(session, personality_id)
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(personality, key, value)
+    await session.commit()
+    await session.refresh(personality)
+    return personality
+
+
+@router.delete("/voice-personalities/{personality_id}", response_model=VoicePersonalityRead, dependencies=[Depends(require_permission("admin.catalog:write"))])
+async def delete_voice_personality(personality_id: str, session: AsyncSession = Depends(get_session)) -> VoicePersonality:
+    personality = await _get_voice_personality(session, personality_id)
+    personality.is_active = False
+    await session.commit()
+    await session.refresh(personality)
+    return personality

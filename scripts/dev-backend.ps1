@@ -1,3 +1,7 @@
+param(
+    [string] $PostgresPort = "5432"
+)
+
 $ErrorActionPreference = "Stop"
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -16,9 +20,10 @@ if (Test-Path $envFile) {
     }
 }
 
-$env:DATABASE_URL = "postgresql+asyncpg://language_user:language_pass@localhost:5432/language_ai"
+$env:DATABASE_URL = "postgresql+asyncpg://language_user:language_pass@localhost:${PostgresPort}/language_ai"
 $env:REDIS_URL = "redis://localhost:6379/0"
 $env:OLLAMA_BASE_URL = "http://localhost:11434"
+$env:OLLAMA_VULKAN = "false"
 [Environment]::SetEnvironmentVariable("CORS_ORIGINS", '["http://localhost","http://localhost:3000"]', "Process")
 
 Set-Location $backendDir

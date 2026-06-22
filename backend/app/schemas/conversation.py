@@ -17,6 +17,7 @@ class ChatRequest(BaseModel):
     custom_scenario: str | None = Field(default=None, max_length=240)
     custom_skills: str | None = Field(default=None, max_length=400)
     voice_preset_id: str | None = None
+    voice_personality_id: str | None = None
     voice_speed: float | None = Field(default=None, ge=0.5, le=1.6)
 
 
@@ -27,6 +28,12 @@ class PedagogicalFeedback(BaseModel):
     encouragement: str
 
 
+class MemoryDebug(BaseModel):
+    summary_used: bool = False
+    recent_turns_used: int = 0
+    persistent_memories_used: int = 0
+
+
 class ChatResponse(BaseModel):
     trace_id: str
     conversation_turn_id: str
@@ -35,3 +42,4 @@ class ChatResponse(BaseModel):
     feedback: PedagogicalFeedback
     latency_ms: dict[str, float]
     usage: UsageSummary
+    memory: MemoryDebug | None = None

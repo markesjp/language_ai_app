@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_session
-from app.models import PracticeScenario, PracticeSkill, VoicePreset
+from app.models import PracticeScenario, PracticeSkill, VoicePersonality, VoicePreset
 from app.schemas.practice import PracticeCatalogResponse
 from app.services.rbac import require_permission
 
@@ -24,10 +24,14 @@ async def catalog(
     skill_query = select(PracticeSkill).where(PracticeSkill.is_active.is_(True))
     scenario_query = select(PracticeScenario).where(PracticeScenario.is_active.is_(True))
     voice_query = select(VoicePreset).where(VoicePreset.is_active.is_(True))
+    personality_query = select(VoicePersonality).where(VoicePersonality.is_active.is_(True))
     if target_language:
         skill_query = skill_query.where((PracticeSkill.target_language.is_(None)) | (PracticeSkill.target_language == target_language))
         scenario_query = scenario_query.where(
             (PracticeScenario.target_language.is_(None)) | (PracticeScenario.target_language == target_language)
+        )
+        personality_query = personality_query.where(
+            (VoicePersonality.target_language.is_(None)) | (VoicePersonality.target_language == target_language)
         )
         prefix = _voice_language_prefix(target_language)
         voice_query = voice_query.where(VoicePreset.language.ilike(f"{prefix}%"))
@@ -41,10 +45,14 @@ async def catalog(
         .order_by(PracticeScenario.title)
     )
     voices_result = await session.execute(
-        voice_query.order_by(VoicePreset.is_default.desc(), VoicePreset.name)
+        voice_query.order_by(VoicePreset.is_default.desc(), VoicePreset.gender, VoicePreset.name)
+    )
+    personalities_result = await session.execute(
+        personality_query.order_by(VoicePersonality.gender, VoicePersonality.name)
     )
     return PracticeCatalogResponse(
         skills=list(skills_result.scalars().all()),
         scenarios=list(scenarios_result.scalars().all()),
         voice_presets=list(voices_result.scalars().all()),
+        voice_personalities=list(personalities_result.scalars().all()),
     )

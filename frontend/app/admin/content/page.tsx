@@ -32,15 +32,31 @@ type VoicePreset = {
   model: string;
   voice: string;
   language: string;
+  gender: "female" | "male" | "neutral";
   speed: number;
   pitch: number;
   is_default: boolean;
   is_active: boolean;
 };
 
+type VoicePersonality = {
+  id: string;
+  name: string;
+  gender: "female" | "male" | "neutral";
+  age: number | null;
+  profession: string;
+  hobbies: string;
+  description: string;
+  tone: string;
+  prompt_instructions: string;
+  target_language: string | null;
+  is_active: boolean;
+};
+
 type SkillDraft = Pick<Skill, "name" | "description" | "target_language" | "level" | "is_active">;
 type ScenarioDraft = Pick<Scenario, "title" | "description" | "prompt_template" | "target_language" | "level" | "is_active"> & { skill_ids: string[] };
 type VoiceDraft = Omit<VoicePreset, "id">;
+type PersonalityDraft = Omit<VoicePersonality, "id">;
 
 const emptySkill: SkillDraft = { name: "", description: "", target_language: "en", level: "beginner", is_active: true };
 const emptyScenario: ScenarioDraft = {
@@ -58,9 +74,22 @@ const emptyVoice: VoiceDraft = {
   model: "browser-speech-synthesis",
   voice: "",
   language: "en-US",
+  gender: "female",
   speed: 0.96,
   pitch: 1,
   is_default: false,
+  is_active: true,
+};
+const emptyPersonality: PersonalityDraft = {
+  name: "",
+  gender: "female",
+  age: 32,
+  profession: "",
+  hobbies: "",
+  description: "",
+  tone: "paciente e gentil",
+  prompt_instructions: "",
+  target_language: "en",
   is_active: true,
 };
 
@@ -71,9 +100,12 @@ export default function AdminContentPage() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [voices, setVoices] = useState<VoicePreset[]>([]);
+  const [personalities, setPersonalities] = useState<VoicePersonality[]>([]);
   const [skillDraft, setSkillDraft] = useState<SkillDraft>(emptySkill);
   const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>(emptyScenario);
   const [voiceDraft, setVoiceDraft] = useState<VoiceDraft>(emptyVoice);
+  const [personalityDraft, setPersonalityDraft] = useState<PersonalityDraft>(emptyPersonality);
+  const [editingPersonalityId, setEditingPersonalityId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -94,17 +126,19 @@ export default function AdminContentPage() {
   async function loadAll() {
     setLoading(true);
     const payload = await guarded(async () => {
-      const [loadedSkills, loadedScenarios, loadedVoices] = await Promise.all([
+      const [loadedSkills, loadedScenarios, loadedVoices, loadedPersonalities] = await Promise.all([
         apiGet<Skill[]>("/admin/skills"),
         apiGet<Scenario[]>("/admin/scenarios"),
         apiGet<VoicePreset[]>("/admin/voice-presets"),
+        apiGet<VoicePersonality[]>("/admin/voice-personalities"),
       ]);
-      return { loadedSkills, loadedScenarios, loadedVoices };
+      return { loadedSkills, loadedScenarios, loadedVoices, loadedPersonalities };
     });
     if (payload) {
       setSkills(payload.loadedSkills);
       setScenarios(payload.loadedScenarios);
       setVoices(payload.loadedVoices);
+      setPersonalities(payload.loadedPersonalities);
     }
     setLoading(false);
   }
@@ -139,6 +173,19 @@ export default function AdminContentPage() {
     }
   }
 
+  async function savePersonality(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const saved = editingPersonalityId
+      ? await guarded(() => apiPut<VoicePersonality, PersonalityDraft>(`/admin/voice-personalities/${editingPersonalityId}`, personalityDraft))
+      : await guarded(() => apiPost<VoicePersonality, PersonalityDraft>("/admin/voice-personalities", personalityDraft));
+    if (saved) {
+      await loadAll();
+      setPersonalityDraft(emptyPersonality);
+      setEditingPersonalityId(null);
+      setMessage(`Personalidade "${saved.name}" salva.`);
+    }
+  }
+
   async function toggleSkill(skill: Skill) {
     const updated = await guarded(() => apiPut<Skill, Partial<Skill>>(`/admin/skills/${skill.id}`, { is_active: !skill.is_active }));
     if (updated) setSkills((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -152,6 +199,36 @@ export default function AdminContentPage() {
   async function toggleVoice(voice: VoicePreset) {
     const updated = await guarded(() => apiPut<VoicePreset, Partial<VoiceDraft>>(`/admin/voice-presets/${voice.id}`, { is_active: !voice.is_active }));
     if (updated) setVoices((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+  }
+
+  async function updateVoiceGender(voice: VoicePreset, gender: VoicePreset["gender"]) {
+    const updated = await guarded(() => apiPut<VoicePreset, Partial<VoiceDraft>>(`/admin/voice-presets/${voice.id}`, { gender }));
+    if (updated) setVoices((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+  }
+
+  async function togglePersonality(personality: VoicePersonality) {
+    const updated = await guarded(() => apiPut<VoicePersonality, Partial<PersonalityDraft>>(`/admin/voice-personalities/${personality.id}`, { is_active: !personality.is_active }));
+    if (updated) setPersonalities((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+  }
+
+  function editPersonality(personality: VoicePersonality) {
+    setEditingPersonalityId(personality.id);
+    setPersonalityDraft({
+      name: personality.name,
+      gender: personality.gender,
+      age: personality.age,
+      profession: personality.profession,
+      hobbies: personality.hobbies,
+      description: personality.description,
+      tone: personality.tone,
+      prompt_instructions: personality.prompt_instructions,
+      target_language: personality.target_language,
+      is_active: personality.is_active,
+    });
+  }
+
+  function genderLabel(gender: VoicePreset["gender"] | VoicePersonality["gender"]) {
+    return { female: "feminino", male: "masculino", neutral: "neutro" }[gender] ?? "neutro";
   }
 
   async function softDelete(path: string) {
@@ -231,6 +308,11 @@ export default function AdminContentPage() {
               <input value={voiceDraft.voice} onChange={(event) => setVoiceDraft({ ...voiceDraft, voice: event.target.value })} placeholder="Nome da voz do navegador (opcional)" />
               <input value={voiceDraft.language} onChange={(event) => setVoiceDraft({ ...voiceDraft, language: event.target.value })} placeholder="Idioma, ex.: en-US" />
             </div>
+            <select value={voiceDraft.gender} onChange={(event) => setVoiceDraft({ ...voiceDraft, gender: event.target.value as VoicePreset["gender"] })}>
+              <option value="female">Feminino</option>
+              <option value="male">Masculino</option>
+              <option value="neutral">Neutro</option>
+            </select>
             <label className="stack">
               <span className="field-label">Velocidade: {voiceDraft.speed.toFixed(2)}x</span>
               <input type="range" min="0.5" max="1.6" step="0.02" value={voiceDraft.speed} onChange={(event) => setVoiceDraft({ ...voiceDraft, speed: Number(event.target.value) })} />
@@ -239,10 +321,53 @@ export default function AdminContentPage() {
           </form>
           {voices.map((voice) => (
             <div className="setting-row" key={voice.id}>
-              <div><strong>{voice.name}</strong><p className="muted">{voice.language} · {voice.speed}x · {voice.is_default ? "padrão" : "alternativo"}</p></div>
+              <div><strong>{voice.name}</strong><p className="muted">{voice.language} · {voice.speed}x · {genderLabel(voice.gender)} · {voice.is_default ? "padrão" : "alternativo"}</p></div>
               <div className="stack">
+                <select value={voice.gender} disabled={!canWriteCatalog} onChange={(event) => updateVoiceGender(voice, event.target.value as VoicePreset["gender"])}>
+                  <option value="female">Feminino</option>
+                  <option value="male">Masculino</option>
+                  <option value="neutral">Neutro</option>
+                </select>
                 <button className="ghost-button" disabled={!canWriteCatalog} onClick={() => toggleVoice(voice)}>{voice.is_active ? "Ativo" : "Inativo"}</button>
                 <button className="ghost-button" disabled={!canWriteCatalog} onClick={() => softDelete(`/admin/voice-presets/${voice.id}`)}>Desativar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="card stack">
+          <h2>Personalidades</h2>
+          <form className="stack" onSubmit={savePersonality}>
+            <input value={personalityDraft.name} onChange={(event) => setPersonalityDraft({ ...personalityDraft, name: event.target.value })} placeholder="Nome da personalidade" />
+            <div className="conversation-grid">
+              <select value={personalityDraft.gender} onChange={(event) => setPersonalityDraft({ ...personalityDraft, gender: event.target.value as VoicePersonality["gender"] })}>
+                <option value="female">Feminino</option>
+                <option value="male">Masculino</option>
+                <option value="neutral">Neutro</option>
+              </select>
+              <input type="number" min="13" max="100" value={personalityDraft.age ?? ""} onChange={(event) => setPersonalityDraft({ ...personalityDraft, age: event.target.value ? Number(event.target.value) : null })} placeholder="Idade" />
+            </div>
+            <div className="conversation-grid">
+              <input value={personalityDraft.profession} onChange={(event) => setPersonalityDraft({ ...personalityDraft, profession: event.target.value })} placeholder="Profissão" />
+              <input value={personalityDraft.target_language ?? ""} onChange={(event) => setPersonalityDraft({ ...personalityDraft, target_language: event.target.value || null })} placeholder="Idioma alvo, ex.: pt" />
+            </div>
+            <input value={personalityDraft.tone} onChange={(event) => setPersonalityDraft({ ...personalityDraft, tone: event.target.value })} placeholder="Tom, ex.: paciente e gentil" />
+            <textarea value={personalityDraft.hobbies} onChange={(event) => setPersonalityDraft({ ...personalityDraft, hobbies: event.target.value })} placeholder="Hobbies" />
+            <textarea value={personalityDraft.description} onChange={(event) => setPersonalityDraft({ ...personalityDraft, description: event.target.value })} placeholder="Descrição" />
+            <textarea value={personalityDraft.prompt_instructions} onChange={(event) => setPersonalityDraft({ ...personalityDraft, prompt_instructions: event.target.value })} placeholder="Instruções de comportamento" />
+            <button disabled={!canWriteCatalog || !personalityDraft.name}>{editingPersonalityId ? "Salvar personalidade" : "Adicionar personalidade"}</button>
+            {editingPersonalityId && <button className="ghost-button" type="button" onClick={() => { setEditingPersonalityId(null); setPersonalityDraft(emptyPersonality); }}>Cancelar edição</button>}
+          </form>
+          {personalities.map((personality) => (
+            <div className="setting-row" key={personality.id}>
+              <div>
+                <strong>{personality.name}</strong>
+                <p className="muted">{genderLabel(personality.gender)} · {personality.age ? `${personality.age} anos · ` : ""}{personality.profession || "Sem profissão"} · {personality.tone}</p>
+              </div>
+              <div className="stack">
+                <button className="ghost-button" disabled={!canWriteCatalog} onClick={() => editPersonality(personality)}>Editar</button>
+                <button className="ghost-button" disabled={!canWriteCatalog} onClick={() => togglePersonality(personality)}>{personality.is_active ? "Ativa" : "Inativa"}</button>
+                <button className="ghost-button" disabled={!canWriteCatalog} onClick={() => softDelete(`/admin/voice-personalities/${personality.id}`)}>Desativar</button>
               </div>
             </div>
           ))}

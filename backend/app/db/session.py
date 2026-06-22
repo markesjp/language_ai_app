@@ -48,6 +48,19 @@ async def create_schema() -> None:
                     await connection.execute(
                         text("ALTER TABLE IF EXISTS learner_profiles ADD COLUMN IF NOT EXISTS recommended_scenario_id VARCHAR(36)")
                     )
+                    await connection.execute(text("ALTER TABLE IF EXISTS conversation_sessions ADD COLUMN IF NOT EXISTS summary TEXT DEFAULT ''"))
+                    await connection.execute(
+                        text("ALTER TABLE IF EXISTS conversation_sessions ADD COLUMN IF NOT EXISTS summary_turn_count INTEGER DEFAULT 0")
+                    )
+                    await connection.execute(
+                        text("ALTER TABLE IF EXISTS conversation_sessions ADD COLUMN IF NOT EXISTS last_user_intent VARCHAR(240) DEFAULT ''")
+                    )
+                    await connection.execute(
+                        text("ALTER TABLE IF EXISTS conversation_sessions ADD COLUMN IF NOT EXISTS open_question VARCHAR(320) DEFAULT ''")
+                    )
+                    await connection.execute(
+                        text("ALTER TABLE IF EXISTS voice_presets ADD COLUMN IF NOT EXISTS gender VARCHAR(16) DEFAULT 'neutral'")
+                    )
             return
         except (ConnectionRefusedError, OSError, OperationalError):
             if attempt == attempts:

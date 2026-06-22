@@ -15,6 +15,7 @@ from app.models.domain import (
     RuntimeSetting,
     UsageLedger,
     User,
+    VoicePersonality,
     VoicePreset,
 )
 
@@ -35,5 +36,6 @@ __all__ = [
     "RuntimeSetting",
     "UsageLedger",
     "User",
+    "VoicePersonality",
     "VoicePreset",
 ]

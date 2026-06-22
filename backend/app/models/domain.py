@@ -132,6 +132,10 @@ class ConversationSession(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     topic: Mapped[str] = mapped_column(String(160))
     mode: Mapped[str] = mapped_column(String(16), default="text")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    summary_turn_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_user_intent: Mapped[str] = mapped_column(String(240), default="")
+    open_question: Mapped[str] = mapped_column(String(320), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
@@ -285,9 +289,32 @@ class VoicePreset(Base):
     model: Mapped[str] = mapped_column(String(120), default="browser-speech-synthesis")
     voice: Mapped[str] = mapped_column(String(160), default="")
     language: Mapped[str] = mapped_column(String(16), default="en-US")
+    gender: Mapped[str] = mapped_column(String(16), default="neutral")
     speed: Mapped[float] = mapped_column(Float, default=0.96)
     pitch: Mapped[float] = mapped_column(Float, default=1.0)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
+class VoicePersonality(Base):
+    __tablename__ = "voice_personalities"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    gender: Mapped[str] = mapped_column(String(16), default="neutral")
+    age: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    profession: Mapped[str] = mapped_column(String(120), default="")
+    hobbies: Mapped[str] = mapped_column(Text, default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    tone: Mapped[str] = mapped_column(String(120), default="friendly")
+    prompt_instructions: Mapped[str] = mapped_column(Text, default="")
+    target_language: Mapped[str | None] = mapped_column(String(16), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(

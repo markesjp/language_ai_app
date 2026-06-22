@@ -58,7 +58,7 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
         self.model = get_runtime_str("ollama_embedding_model", settings.ollama_embedding_model) or settings.ollama_embedding_model
 
     async def embed(self, text: str) -> list[float]:
-        payload = {"model": self.model, "input": text}
+        payload = {"model": self.model, "input": text, "keep_alive": "15m"}
         base_url = get_runtime_str("ollama_base_url", settings.ollama_base_url)
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(f"{base_url}/api/embed", json=payload)

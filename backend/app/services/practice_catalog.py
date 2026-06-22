@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import PracticeScenario, PracticeSkill, VoicePreset
+from app.models import PracticeScenario, PracticeSkill, VoicePersonality, VoicePreset
 
 
 DEFAULT_SKILLS = [
@@ -33,6 +33,67 @@ LANGUAGES = {
     "fr": {"label": "Francês", "voice_language": "fr-FR"},
     "pt": {"label": "Português", "voice_language": "pt-BR"},
 }
+
+VOICE_BLUEPRINTS = [
+    ("feminina clara", "female", 0.96, True),
+    ("feminina lenta", "female", 0.84, False),
+    ("masculina clara", "male", 0.96, False),
+    ("masculina lenta", "male", 0.84, False),
+    ("neutra clara", "neutral", 0.94, False),
+]
+
+PERSONALITY_BLUEPRINTS = [
+    {
+        "suffix": "Marina paciente",
+        "gender": "female",
+        "age": 32,
+        "profession": "professora de idiomas",
+        "hobbies": "música, viagens e café",
+        "description": "Tutora feminina paciente, acolhedora e encorajadora.",
+        "tone": "paciente e gentil",
+        "prompt_instructions": "Fale como uma tutora paciente. Corrija com delicadeza, use exemplos curtos e mantenha a conversa leve.",
+    },
+    {
+        "suffix": "Rafael conversacional",
+        "gender": "male",
+        "age": 35,
+        "profession": "mentor de conversação",
+        "hobbies": "cinema, tecnologia e esportes",
+        "description": "Tutor masculino direto, casual e natural.",
+        "tone": "conversacional e objetivo",
+        "prompt_instructions": "Fale como um mentor casual. Faça perguntas naturais, corrija sem formalidade excessiva e mantenha fluidez.",
+    },
+    {
+        "suffix": "Lia barista",
+        "gender": "female",
+        "age": 28,
+        "profession": "barista",
+        "hobbies": "cafés especiais, livros e fotografia",
+        "description": "Personagem de café/restaurante para prática cotidiana.",
+        "tone": "simpática e prática",
+        "prompt_instructions": "Simule uma conversa de café ou restaurante quando fizer sentido. Seja simpática, breve e contextual.",
+    },
+    {
+        "suffix": "Carlos profissional",
+        "gender": "male",
+        "age": 41,
+        "profession": "recrutador e gerente",
+        "hobbies": "negócios, leitura e corrida",
+        "description": "Persona profissional para entrevistas e reuniões.",
+        "tone": "profissional e respeitoso",
+        "prompt_instructions": "Fale como um profissional de trabalho. Ajude com respostas claras, polidas e adequadas a entrevistas ou reuniões.",
+    },
+    {
+        "suffix": "Sofia guia",
+        "gender": "female",
+        "age": 37,
+        "profession": "guia de viagem",
+        "hobbies": "história, mapas e gastronomia",
+        "description": "Guia de viagem para hotel, aeroporto e direções.",
+        "tone": "calma e prestativa",
+        "prompt_instructions": "Fale como uma guia de viagem prestativa. Dê respostas práticas e continue o contexto de viagem quando aplicável.",
+    },
+]
 
 
 def _scenario_title(base_title: str, language_label: str) -> str:
@@ -84,19 +145,43 @@ async def bootstrap_practice_catalog(session: AsyncSession) -> None:
     existing_voices = await session.execute(select(VoicePreset))
     voices_by_name = {voice.name: voice for voice in existing_voices.scalars().all()}
     for language_code, language in LANGUAGES.items():
-        for name_suffix, speed, default_for_language in [("claro", 0.96, True), ("lento", 0.82, False)]:
+        for name_suffix, gender, speed, default_for_language in VOICE_BLUEPRINTS:
             name = f"Tutor {language['label']} {name_suffix}"
             voice = voices_by_name.get(name)
             if not voice:
-                voice = VoicePreset(name=name)
+                voice = VoicePreset(
+                    name=name,
+                    provider="browser",
+                    model="browser-speech-synthesis",
+                    voice="",
+                    language=language["voice_language"],
+                    gender=gender,
+                    speed=speed,
+                    pitch=1.0,
+                    is_default=default_for_language and language_code == "en",
+                    is_active=True,
+                )
                 session.add(voice)
-            voice.provider = "browser"
-            voice.model = "browser-speech-synthesis"
-            voice.voice = ""
-            voice.language = language["voice_language"]
-            voice.speed = speed
-            voice.pitch = 1.0
-            voice.is_default = default_for_language and language_code == "en"
-            voice.is_active = True
+
+    existing_personalities = await session.execute(select(VoicePersonality))
+    personalities_by_name = {personality.name: personality for personality in existing_personalities.scalars().all()}
+    for language_code, language in LANGUAGES.items():
+        for blueprint in PERSONALITY_BLUEPRINTS:
+            name = f"{blueprint['suffix']} em {language['label']}"
+            if name not in personalities_by_name:
+                session.add(
+                    VoicePersonality(
+                        name=name,
+                        gender=blueprint["gender"],
+                        age=blueprint["age"],
+                        profession=blueprint["profession"],
+                        hobbies=blueprint["hobbies"],
+                        description=f"{blueprint['description']} Idioma: {language['label']}.",
+                        tone=blueprint["tone"],
+                        prompt_instructions=blueprint["prompt_instructions"],
+                        target_language=language_code,
+                        is_active=True,
+                    )
+                )
 
     await session.commit()

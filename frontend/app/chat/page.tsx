@@ -33,9 +33,23 @@ type VoicePreset = {
   model: string;
   voice: string;
   language: string;
+  gender: "female" | "male" | "neutral";
   speed: number;
   pitch: number;
   is_default: boolean;
+  is_active: boolean;
+};
+
+type VoicePersonality = {
+  id: string;
+  name: string;
+  gender: "female" | "male" | "neutral";
+  age: number | null;
+  profession: string;
+  hobbies: string;
+  description: string;
+  tone: string;
+  target_language: string | null;
   is_active: boolean;
 };
 
@@ -43,6 +57,7 @@ type CatalogResponse = {
   skills: Skill[];
   scenarios: Scenario[];
   voice_presets: VoicePreset[];
+  voice_personalities: VoicePersonality[];
 };
 
 type ChatResponse = {
@@ -106,7 +121,14 @@ const languageOptions = [
   { label: "Português", target: "pt", speech: "pt-BR", starter: "Quero me apresentar e praticar uma conversa curta." },
 ];
 
-const fallbackCatalog: CatalogResponse = { skills: [], scenarios: [], voice_presets: [] };
+const fallbackCatalog: CatalogResponse = { skills: [], scenarios: [], voice_presets: [], voice_personalities: [] };
+
+const continueMessages: Record<string, string> = {
+  en: "Let's continue where we stopped.",
+  es: "Continuemos desde donde paramos.",
+  fr: "Continuons la conversation depuis notre dernier point.",
+  pt: "Vamos continuar de onde paramos.",
+};
 
 export default function ChatPage() {
   const router = useRouter();
@@ -116,6 +138,7 @@ export default function ChatPage() {
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [selectedVoicePresetId, setSelectedVoicePresetId] = useState("");
+  const [selectedPersonalityId, setSelectedPersonalityId] = useState("");
   const [voiceSpeed, setVoiceSpeed] = useState(0.96);
   const [message, setMessage] = useState(languageOptions[0].starter);
   const [customScenario, setCustomScenario] = useState("");
@@ -127,6 +150,7 @@ export default function ChatPage() {
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [missionBanner, setMissionBanner] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pendingVoicePresetId, setPendingVoicePresetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
@@ -143,6 +167,14 @@ export default function ChatPage() {
   );
   const selectedScenario = catalog.scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? null;
   const selectedVoice = catalog.voice_presets.find((preset) => preset.id === selectedVoicePresetId) ?? catalog.voice_presets[0] ?? null;
+  const selectedPersonality = catalog.voice_personalities.find((personality) => personality.id === selectedPersonalityId) ?? catalog.voice_personalities[0] ?? null;
+  const compatibleVoices = useMemo(
+    () =>
+      catalog.voice_presets.filter(
+        (preset) => !selectedPersonality || selectedPersonality.gender === "neutral" || preset.gender === "neutral" || preset.gender === selectedPersonality.gender,
+      ),
+    [catalog.voice_presets, selectedPersonality],
+  );
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -182,7 +214,13 @@ export default function ChatPage() {
         } else {
           setMissionBanner("");
         }
-        const voice = payload.voice_presets.find((preset) => preset.id === user.voice_preference) ?? payload.voice_presets[0] ?? null;
+        const personality = payload.voice_personalities[0] ?? null;
+        setSelectedPersonalityId(personality?.id ?? "");
+        const voice =
+          payload.voice_presets.find((preset) => preset.id === user.voice_preference && !isGenderMismatch(preset, personality)) ??
+          payload.voice_presets.find((preset) => !personality || personality.gender === "neutral" || preset.gender === "neutral" || preset.gender === personality.gender) ??
+          payload.voice_presets[0] ??
+          null;
         setSelectedVoicePresetId(voice?.id ?? "");
         setVoiceSpeed(voice?.speed ?? 0.96);
         setMessage(language.starter);
@@ -222,6 +260,7 @@ export default function ChatPage() {
     setTargetLanguage(nextLanguage);
     setSelectedScenarioId("");
     setSelectedVoicePresetId("");
+    setSelectedPersonalityId("");
     setSelectedSkillIds([]);
     await apiPatch("/profiles/me", { target_language: nextLanguage });
     notifySessionChanged();
@@ -232,8 +271,40 @@ export default function ChatPage() {
     return window.SpeechRecognition ?? window.webkitSpeechRecognition;
   }
 
-  function toggleSkill(skillId: string) {
+function toggleSkill(skillId: string) {
     setSelectedSkillIds((current) => (current.includes(skillId) ? current.filter((id) => id !== skillId) : [...current, skillId]));
+  }
+
+  function genderLabel(gender: VoicePreset["gender"] | VoicePersonality["gender"]) {
+    return { female: "feminino", male: "masculino", neutral: "neutro" }[gender] ?? "neutro";
+  }
+
+  function isGenderMismatch(voice: VoicePreset | null, personality: VoicePersonality | null) {
+    if (!voice || !personality) return false;
+    if (voice.gender === "neutral" || personality.gender === "neutral") return false;
+    return voice.gender !== personality.gender;
+  }
+
+  function chooseVoicePreset(nextVoicePresetId: string) {
+    const nextVoice = catalog.voice_presets.find((preset) => preset.id === nextVoicePresetId) ?? null;
+    if (isGenderMismatch(nextVoice, selectedPersonality)) {
+      setPendingVoicePresetId(nextVoicePresetId);
+      return;
+    }
+    setSelectedVoicePresetId(nextVoicePresetId);
+    setVoiceSpeed(nextVoice?.speed ?? voiceSpeed);
+  }
+
+  function choosePersonality(nextPersonalityId: string) {
+    const nextPersonality = catalog.voice_personalities.find((personality) => personality.id === nextPersonalityId) ?? null;
+    setSelectedPersonalityId(nextPersonalityId);
+    const sameGenderVoice = catalog.voice_presets.find(
+      (preset) => !nextPersonality || nextPersonality.gender === "neutral" || preset.gender === "neutral" || preset.gender === nextPersonality.gender,
+    );
+    if (sameGenderVoice) {
+      setSelectedVoicePresetId(sameGenderVoice.id);
+      setVoiceSpeed(sameGenderVoice.speed);
+    }
   }
 
   function buildScenarioMessage(spokenMessage: string) {
@@ -288,6 +359,7 @@ export default function ChatPage() {
         custom_scenario: selectedScenario ? null : customScenario,
         custom_skills: customSkills,
         voice_preset_id: selectedVoice?.id ?? null,
+        voice_personality_id: selectedPersonality?.id ?? null,
         voice_speed: voiceSpeed,
       });
       setResponse(result);
@@ -387,6 +459,31 @@ export default function ChatPage() {
 
       {missionBanner && <div className="status-card">{missionBanner}</div>}
       {error && <div className="status-card warning">{error}</div>}
+      {pendingVoicePresetId && (
+        <div className="status-card warning stack">
+          <strong>Voz e personalidade com gêneros diferentes</strong>
+          <p className="muted">
+            A voz selecionada é {genderLabel(catalog.voice_presets.find((preset) => preset.id === pendingVoicePresetId)?.gender ?? "neutral")}, mas a personalidade é{" "}
+            {genderLabel(selectedPersonality?.gender ?? "neutral")}. Deseja continuar?
+          </p>
+          <div className="voice-controls">
+            <button
+              type="button"
+              onClick={() => {
+                const nextVoice = catalog.voice_presets.find((preset) => preset.id === pendingVoicePresetId) ?? null;
+                setSelectedVoicePresetId(pendingVoicePresetId);
+                setVoiceSpeed(nextVoice?.speed ?? voiceSpeed);
+                setPendingVoicePresetId(null);
+              }}
+            >
+              Continuar mesmo assim
+            </button>
+            <button className="ghost-button" type="button" onClick={() => setPendingVoicePresetId(null)}>
+              Cancelar e manter voz compatível
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="settings-grid">
         <div className="card stack">
@@ -430,11 +527,31 @@ export default function ChatPage() {
           </label>
           <label className="stack">
             <span className="field-label">Voz compatível</span>
-            <select value={selectedVoicePresetId} onChange={(event) => setSelectedVoicePresetId(event.target.value)} disabled={!catalog.voice_presets.length}>
-              {catalog.voice_presets.map((preset) => <option value={preset.id} key={preset.id}>{preset.name} · {preset.language}</option>)}
+            <select value={selectedVoicePresetId} onChange={(event) => chooseVoicePreset(event.target.value)} disabled={!catalog.voice_presets.length}>
+              {catalog.voice_presets.map((preset) => <option value={preset.id} key={preset.id}>{preset.name} · {preset.language} · {genderLabel(preset.gender)}</option>)}
             </select>
           </label>
+          <label className="stack">
+            <span className="field-label">Personalidade da IA</span>
+            <select value={selectedPersonalityId} onChange={(event) => choosePersonality(event.target.value)} disabled={!catalog.voice_personalities.length}>
+              {catalog.voice_personalities.map((personality) => (
+                <option value={personality.id} key={personality.id}>
+                  {personality.name} · {genderLabel(personality.gender)} · {personality.profession || "tutor"}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedPersonality && (
+            <div className="status-card">
+              <strong>{selectedPersonality.name}</strong>
+              <p className="muted">
+                {selectedPersonality.age ? `${selectedPersonality.age} anos · ` : ""}
+                {selectedPersonality.profession || "Tutor"} · {selectedPersonality.tone || "amigável"}
+              </p>
+            </div>
+          )}
           {!catalog.voice_presets.length && <div className="status-card warning">Sem voz compatível para este idioma.</div>}
+          {selectedPersonality && !compatibleVoices.length && <div className="status-card warning">Sem voz do mesmo gênero; escolha uma voz neutra ou confirme uma exceção.</div>}
           <label className="stack">
             <span className="field-label">Velocidade da voz: {voiceSpeed.toFixed(2)}x</span>
             <input type="range" min="0.5" max="1.6" step="0.02" value={voiceSpeed} onChange={(event) => setVoiceSpeed(Number(event.target.value))} />
@@ -463,7 +580,7 @@ export default function ChatPage() {
           <span className="mission-icon">4</span>
           <div><span className="pill">Mensagem/conversa</span><h2>Vamos praticar</h2></div>
         </div>
-        {sessionId && <button className="ghost-button" type="button" onClick={() => setMessage("Let's continue where we stopped.")}>Continuar de onde parei</button>}
+        {sessionId && <button className="ghost-button" type="button" onClick={() => setMessage(continueMessages[targetLanguage] ?? language.starter)}>Continuar de onde parei</button>}
         <textarea value={message} onChange={(event) => setMessage(event.target.value)} />
         <div className="voice-controls">
           <button onClick={toggleConversation} disabled={loading && status !== "speaking"}>

@@ -43,6 +43,12 @@ Se nao quiser abrir o navegador automaticamente:
 .\scripts\dev-fast.ps1 -NoBrowser
 ```
 
+Se quiser pular o aquecimento dos modelos do Ollama:
+
+```powershell
+.\scripts\dev-fast.ps1 -NoWarmOllama
+```
+
 Para prender os logs do Docker Compose no terminal atual:
 
 ```powershell
