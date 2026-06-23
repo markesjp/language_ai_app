@@ -20,7 +20,7 @@ async def ingest_document(
     payload: DocumentIngestRequest,
     session: AsyncSession = Depends(get_session),
 ) -> DocumentIngestResponse:
-    store = RagVectorStore(session, provider_router.get_embeddings())
+    store = RagVectorStore(session, provider_router.get_embeddings(), provider_router.get_rerank())
     document_id, chunks_indexed = await store.ingest_document(
         domain="admin-docs",
         title=payload.title,
@@ -41,7 +41,7 @@ async def ask_admin_rag(
     trace = TraceContext()
     tracker = LatencyTracker()
     llm = provider_router.get_llm()
-    store = RagVectorStore(session, provider_router.get_embeddings())
+    store = RagVectorStore(session, provider_router.get_embeddings(), provider_router.get_rerank())
 
     async with timed_step(tracker, "rag_duration"):
         matches = await store.search(domain="admin-docs", query=payload.question, limit=5)

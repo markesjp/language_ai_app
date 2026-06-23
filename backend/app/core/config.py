@@ -17,12 +17,39 @@ class Settings(BaseSettings):
     default_stt_provider: str = "mock"
     default_tts_provider: str = "mock"
     default_embedding_provider: str = "mock"
+    default_rerank_provider: str = "none"
     embedding_dimension: int = 64
 
     gemini_api_key: str | None = None
     gemini_api_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_llm_model: str = "gemini-3.5-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
+
+    groq_api_key: str | None = None
+    groq_api_base_url: str = "https://api.groq.com/openai/v1"
+    groq_llm_model: str = "llama-3.1-8b-instant"
+    groq_stt_model: str = "whisper-large-v3-turbo"
+
+    nvidia_nim_api_key: str | None = None
+    nvidia_nim_api_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_nim_llm_model: str = "meta/llama-3.1-8b-instruct"
+    nvidia_nim_embedding_model: str = "nvidia/nv-embedqa-e5-v5"
+    nvidia_nim_rerank_model: str = "nvidia/nv-rerankqa-mistral-4b-v3"
+
+    cohere_api_key: str | None = None
+    cohere_api_base_url: str = "https://api.cohere.com"
+    cohere_embedding_model: str = "embed-v4.0"
+    cohere_rerank_model: str = "rerank-v3.5"
+
+    deepgram_api_key: str | None = None
+    deepgram_api_base_url: str = "https://api.deepgram.com"
+    deepgram_stt_model: str = "nova-3"
+    deepgram_tts_model: str = "aura-2-thalia-en"
+
+    elevenlabs_api_key: str | None = None
+    elevenlabs_api_base_url: str = "https://api.elevenlabs.io"
+    elevenlabs_tts_model: str = "eleven_multilingual_v2"
+    elevenlabs_default_voice_id: str = "21m00Tcm4TlvDq8ikWAM"
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_llm_model: str = "llama3.2"

@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RagChunk, RagDocument
 from app.schemas.common import SourceCitation
-from app.services.ai_providers.base import EmbeddingProvider
+from app.services.ai_providers.base import EmbeddingProvider, RerankProvider
+from app.services.ai_providers.mock import NoopRerankProvider
 from app.services.rag.chunking import chunk_text
 
 
@@ -19,9 +20,10 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 
 
 class RagVectorStore:
-    def __init__(self, session: AsyncSession, embeddings: EmbeddingProvider):
+    def __init__(self, session: AsyncSession, embeddings: EmbeddingProvider, reranker: RerankProvider | None = None):
         self.session = session
         self.embeddings = embeddings
+        self.reranker = reranker or NoopRerankProvider()
 
     async def ingest_document(
         self,
@@ -65,24 +67,42 @@ class RagVectorStore:
             return []
 
         query_embedding = await self.embeddings.embed(query)
+        candidate_limit = max(limit, limit * 3)
         if self.session.bind and self.session.bind.dialect.name == "postgresql" and len(query_embedding) == 64:
             distance = RagChunk.embedding_vector.cosine_distance(query_embedding)
             result = await self.session.execute(
                 select(RagChunk, distance.label("distance"))
                 .where(RagChunk.domain == domain, RagChunk.embedding_vector.is_not(None))
                 .order_by(distance)
-                .limit(limit)
+                .limit(candidate_limit)
             )
             rows = result.all()
             if rows:
-                return [(chunk, max(0, min(1, 1 - float(distance)))) for chunk, distance in rows]
+                scored = [(chunk, max(0, min(1, 1 - float(distance)))) for chunk, distance in rows]
+                return await self._maybe_rerank(query=query, candidates=scored, limit=limit)
 
         result = await self.session.execute(select(RagChunk).where(RagChunk.domain == domain))
         scored = [
             (chunk, cosine_similarity(query_embedding, chunk.embedding_json))
             for chunk in result.scalars().all()
         ]
-        return sorted(scored, key=lambda item: item[1], reverse=True)[:limit]
+        candidates = sorted(scored, key=lambda item: item[1], reverse=True)[:candidate_limit]
+        return await self._maybe_rerank(query=query, candidates=candidates, limit=limit)
+
+    async def _maybe_rerank(self, *, query: str, candidates: list[tuple[RagChunk, float]], limit: int) -> list[tuple[RagChunk, float]]:
+        if not candidates or self.reranker.name in {"none", "mock"}:
+            return candidates[:limit]
+
+        reranked = await self.reranker.rerank(query, [chunk.content for chunk, score in candidates], top_n=limit)
+        by_index = {index: score for index, score in reranked}
+        ordered = [
+            (candidates[index][0], max(0, min(1, score)))
+            for index, score in reranked
+            if 0 <= index < len(candidates)
+        ]
+        if len(ordered) < limit:
+            ordered.extend((chunk, score) for index, (chunk, score) in enumerate(candidates) if index not in by_index)
+        return ordered[:limit]
 
 
 def citation_from_chunk(chunk: RagChunk, score: float) -> SourceCitation:

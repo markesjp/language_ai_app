@@ -34,3 +34,12 @@ class EmbeddingProvider(ABC):
     @abstractmethod
     async def embed(self, text: str) -> list[float]:
         raise NotImplementedError
+
+
+class RerankProvider(ABC):
+    name: str
+    model: str
+
+    @abstractmethod
+    async def rerank(self, query: str, documents: list[str], top_n: int | None = None) -> list[tuple[int, float]]:
+        raise NotImplementedError

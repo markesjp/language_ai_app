@@ -52,7 +52,7 @@ class ConversationService:
 
         llm = provider_router.get_llm()
         embeddings = provider_router.get_embeddings()
-        rag_store = RagVectorStore(self.session, embeddings)
+        rag_store = RagVectorStore(self.session, embeddings, provider_router.get_rerank())
         memory_domain = self._memory_domain(request.user_id)
 
         async with timed_step(tracker, "history_duration"):

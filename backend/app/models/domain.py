@@ -175,7 +175,7 @@ class RagDocument(Base):
     __tablename__ = "rag_documents"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    domain: Mapped[str] = mapped_column(String(32), index=True)
+    domain: Mapped[str] = mapped_column(String(120), index=True)
     title: Mapped[str] = mapped_column(String(255))
     source_uri: Mapped[str] = mapped_column(String(512))
     language: Mapped[str] = mapped_column(String(16), default="pt")
@@ -188,7 +188,7 @@ class RagChunk(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     document_id: Mapped[str] = mapped_column(ForeignKey("rag_documents.id"), index=True)
-    domain: Mapped[str] = mapped_column(String(32), index=True)
+    domain: Mapped[str] = mapped_column(String(120), index=True)
     content: Mapped[str] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     embedding_json: Mapped[list[float]] = mapped_column(JSON, default=list)

@@ -1,7 +1,7 @@
 import hashlib
 import math
 
-from app.services.ai_providers.base import EmbeddingProvider, LlmProvider, LlmResult, LlmUsage
+from app.services.ai_providers.base import EmbeddingProvider, LlmProvider, LlmResult, LlmUsage, RerankProvider
 
 
 class MockLlmProvider(LlmProvider):
@@ -37,3 +37,12 @@ class MockEmbeddingProvider(EmbeddingProvider):
         values = [(byte / 255.0) for byte in digest + digest]
         magnitude = math.sqrt(sum(value * value for value in values)) or 1
         return [round(value / magnitude, 6) for value in values]
+
+
+class NoopRerankProvider(RerankProvider):
+    name = "none"
+    model = "none"
+
+    async def rerank(self, query: str, documents: list[str], top_n: int | None = None) -> list[tuple[int, float]]:
+        limit = top_n or len(documents)
+        return [(index, 1.0) for index in range(min(limit, len(documents)))]

@@ -1,278 +1,149 @@
-# LinguaFlow AI
+# LinguaFlow AI 🗣️🤖
 
-App web para aprendizado de línguas com IA conversacional, RAG, voz opcional, analytics e auditoria de latência/tokens.
+![LinguaFlow AI](https://img.shields.io/badge/Status-Active-brightgreen) ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg) ![Next.js](https://img.shields.io/badge/Next.js-14-black) ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg) ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)
 
-## O que já está implementado
+**LinguaFlow AI** is a complete web application designed for conversational language learning powered by AI. It features text and voice chat capabilities, document-based Retrieval-Augmented Generation (RAG), comprehensive analytics, and system auditing for tokens and latency.
 
-- Backend FastAPI em `/api/v1`.
-- Frontend Next.js responsivo.
-- Docker Compose com Nginx, Postgres/pgvector, PgBouncer, Redis e Prometheus.
-- Chat textual com providers `mock`, `gemini` e `ollama`.
-- RAG admin documental com chunking, embeddings, fontes, confiança e auditoria.
-- Busca vetorial com pgvector quando o banco é PostgreSQL, com fallback JSON/cosseno para ambientes simples.
-- Login admin com senha mestre hasheada no banco e cookie HTTP-only.
-- Painel de configurações para IA, RAG, sistema e segurança.
+## ✨ Features
 
-## Desenvolvimento rapido com hot reload
+- **Conversational AI**: Practice languages via text or voice.
+- **Multi-Provider Support**: Seamlessly switch between local AI (Ollama) and cloud APIs (Google Gemini).
+- **Advanced RAG System**: Upload documents, chunk text, and perform vector searches to ground AI responses in your custom context.
+- **Admin Dashboard**: Manage settings, monitor system latency, track token usage, and adjust RAG confidence thresholds.
+- **Robust Authentication**: Secure admin access with hashed master passwords and HTTP-only cookies, plus Google OAuth support for users.
+- **Developer-Friendly**: Hot-reloading development scripts, Docker Compose for production-like environments, and robust logging.
 
-Para ver mudancas com velocidade, use o modo hibrido: Postgres, PgBouncer, Redis e Prometheus ficam no Docker; backend e frontend rodam direto no Windows com reload automatico.
+## 🏗️ Tech Stack
 
-Rode um unico script:
+> **📖 Want to dive deeper?** Check out our detailed [Architecture & Design Document](ARCHITECTURE.md) to learn about data flows, system components, and core strengths.
 
+- **Frontend**: Next.js (React), TailwindCSS, TypeScript.
+- **Backend**: Python, FastAPI, SQLAlchemy, LlamaIndex/LangChain concepts.
+- **Database**: PostgreSQL with `pgvector` for vector embeddings.
+- **Caching & Async**: Redis.
+- **Connection Pooling**: PgBouncer.
+- **Monitoring**: Prometheus (optional).
+- **AI Models**: Local inference via Ollama (`llama3.2`, `nomic-embed-text`) or Google Gemini.
+- **Infrastructure**: Docker, Docker Compose, Nginx.
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (ensure it's running)
+- [Node.js](https://nodejs.org/) (v18+)
+- [Python](https://www.python.org/) (3.11+)
+- [Ollama](https://ollama.com/) (Optional, but highly recommended for local, free AI inference)
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/language_ai_app.git
+cd language_ai_app
+```
+
+### 2. Configure Environment
+
+Copy the example environment file:
+```bash
+cp .env.example .env
+```
+*Note: The default settings in `.env.example` are pre-configured to work out-of-the-box with the local development scripts.*
+
+### 3. Local Development (Fast Mode)
+
+The easiest way to start developing is using our hybrid fast-mode script. It runs databases in Docker, but keeps the Frontend (Next.js) and Backend (FastAPI) running natively on your OS for instant hot-reloading.
+
+**On Windows (PowerShell):**
 ```powershell
 .\scripts\dev-fast.ps1
 ```
 
-Ele cria o `.venv` do backend se faltar, instala dependencias, sobe backend e frontend em janelas separadas, espera os servicos responderem e abre `http://localhost:3000`.
+This script will automatically:
+1. Create a Python `.venv` and install backend dependencies.
+2. Install Node.js frontend dependencies.
+3. Spin up Postgres and Redis in Docker.
+4. Launch the FastAPI backend and Next.js frontend in separate windows.
+5. Open your browser to `http://localhost:3000`.
 
-Para subir somente o essencial, sem Prometheus:
+**Useful Flags:**
+- `.\scripts\dev-fast.ps1 -SkipPrometheus` : Run without Prometheus monitoring.
+- `.\scripts\dev-fast.ps1 -NoInstall` : Skip dependency installation (faster startups).
 
-```powershell
-.\scripts\dev-fast.ps1 -SkipPrometheus
-```
+### 4. Full Docker Environment (Production-like)
 
-Para pular instalacao de dependencias quando voce sabe que nada mudou:
-
-```powershell
-.\scripts\dev-fast.ps1 -NoInstall
-```
-
-Se nao quiser abrir o navegador automaticamente:
-
-```powershell
-.\scripts\dev-fast.ps1 -NoBrowser
-```
-
-Se quiser pular o aquecimento dos modelos do Ollama:
-
-```powershell
-.\scripts\dev-fast.ps1 -NoWarmOllama
-```
-
-Para prender os logs do Docker Compose no terminal atual:
-
-```powershell
-.\scripts\dev-fast.ps1 -Attached
-```
-
-Fallback manual para o backend:
-
-```powershell
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Fallback manual para o frontend:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Depois acesse:
-
-- Web dev: `http://localhost:3000`
-- API dev: `http://localhost:8000/api/v1/health`
-- Swagger/OpenAPI dev: `http://localhost:8000/docs`
-- Prometheus: `http://localhost:9090`
-
-O frontend ja usa `http://localhost:8000/api/v1` por padrao quando `NEXT_PUBLIC_API_BASE_URL` nao esta definido.
-No modo rapido, o backend usa Postgres direto em `localhost:5432` para evitar problemas de startup/DDL via PgBouncer.
-
-Se voce tiver `make` instalado, tambem pode subir a infraestrutura rapida com:
-
-```powershell
-make dev-fast
-```
-
-## Rodar localmente com Docker completo
-
-Use este fluxo para validar a stack completa com Nginx e imagens Docker, mais proximo de producao.
-
-Pré-requisito recomendado para IA local: Ollama rodando no Windows host.
-
-```powershell
-ollama serve
-ollama pull llama3.2
-ollama pull nomic-embed-text
-```
-
-Depois, na raiz do projeto, use o comando mais compatível com Windows:
+If you want to run the entire stack (including Nginx routing) inside Docker:
 
 ```powershell
 .\scripts\dev-up.ps1
 ```
+*(Or run `make up` if you have Make installed).*
 
-Para rodar em segundo plano:
-
-```powershell
-.\scripts\dev-up.ps1 -Detached
-```
-
-Se você tiver `make` instalado, também pode usar:
-
-```powershell
-make up
-```
-
-Fallback manual:
-
-```powershell
-docker compose up --build
-```
-
-Depois acesse:
-
+Access the application:
 - Web: `http://localhost`
-- Login do aluno: `http://localhost/login`
-- Chat: `http://localhost/chat`
-- Login admin: `http://localhost/admin/login`
-- Senha admin inicial: `admin123`
-- Configurações admin: `http://localhost/admin/settings`
-- Health da API: `http://localhost/api/v1/health`
-- Swagger/OpenAPI: `http://localhost/docs`
-- Prometheus: `http://localhost:9090`
+- API Health: `http://localhost/api/v1/health`
+- Swagger Docs: `http://localhost/docs`
 
-Fluxo do aluno:
+---
 
-- `http://localhost` valida a sessão automaticamente.
-- Sem sessão, vai para `/login`.
-- Primeiro acesso vai para `/onboarding`.
-- Sessão ativa e onboarding completo vai para `/chat`.
+## 🧠 AI Configuration (Ollama)
 
-Para login com Google, configure no `.env`:
+For the best free, private experience, we use **Ollama**.
 
+1. Install Ollama on your host machine.
+2. Pull the required models:
+   ```powershell
+   ollama pull llama3.2
+   ollama pull nomic-embed-text
+   ```
+3. Start the Ollama server:
+   ```powershell
+   ollama serve
+   ```
+*Note: Our scripts automatically detect Ollama and optimize it to use your NVIDIA GPU (CUDA) by disabling conflicting Vulkan fallback settings.*
+
+If you prefer to use **Google Gemini**:
+Update your `.env` file:
 ```env
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost/api/v1/auth/google/callback
-FRONTEND_POST_LOGIN_URL=http://localhost/chat
-FRONTEND_ONBOARDING_URL=http://localhost/onboarding
+DEFAULT_LLM_PROVIDER=gemini
+DEFAULT_EMBEDDING_PROVIDER=gemini
+GEMINI_API_KEY=your_api_key_here
+GEMINI_LLM_MODEL=gemini-3.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 ```
 
-## Ollama com GPU
+---
 
-### Opção padrão: Ollama no Windows host
+## 🗺️ Application Structure
 
-Este é o caminho mais simples para usar sua GPU NVIDIA.
+- `/frontend` - Next.js application.
+- `/backend` - FastAPI application.
+- `/infra` - Nginx and database initialization scripts.
+- `/scripts` - Automation scripts for Windows/Linux (`dev-fast`, `dev-up`, `rebuild`).
+- `/docs` - Additional documentation.
 
-```powershell
-nvidia-smi
-ollama serve
-ollama pull llama3.2
-ollama pull nomic-embed-text
-Invoke-RestMethod http://localhost:11434/api/tags
-```
+## 🧹 Maintenance Commands
 
-O `.env` deve manter:
-
-```env
-DEFAULT_LLM_PROVIDER=ollama
-DEFAULT_EMBEDDING_PROVIDER=ollama
-OLLAMA_BASE_URL=http://host.docker.internal:11434
-OLLAMA_LLM_MODEL=llama3.2
-OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-```
-
-### Opção avançada: Ollama em Docker com GPU
-
-Use apenas se o Docker Desktop/WSL já estiver configurado com suporte NVIDIA.
-
-```powershell
-make up-ollama-docker
-make ollama-docker-pull
-```
-
-No Windows sem `make`, use:
-
-```powershell
-.\scripts\dev-up.ps1 -OllamaDocker
-```
-
-Fallback manual:
-
-```powershell
-docker compose -f docker-compose.yml -f docker-compose.ollama.yml --profile ollama-gpu up --build
-docker compose -f docker-compose.yml -f docker-compose.ollama.yml --profile ollama-gpu exec ollama ollama pull llama3.2
-docker compose -f docker-compose.yml -f docker-compose.ollama.yml --profile ollama-gpu exec ollama ollama pull nomic-embed-text
-```
-
-## Builds sem acúmulo de espaço
-
-Use rebuild seguro, sem apagar volumes do banco:
-
-```powershell
-make rebuild
-```
-
-No Windows sem `make`:
-
-```powershell
-.\scripts\rebuild.ps1
-```
-
-Para limpar imagens dangling e cache antigo sem apagar `postgres_data`, `redis_data` ou modelos Ollama:
-
-```powershell
-make clean-docker
-```
-
-No Windows sem `make`:
-
+Clean up Docker space without losing your database volumes or Ollama models:
 ```powershell
 .\scripts\clean-docker.ps1
 ```
 
-Fallback sem `make`:
-
+Rebuild the Docker containers safely:
 ```powershell
-docker compose build frontend backend worker
-docker compose up -d --force-recreate frontend backend worker nginx
-docker image prune -f
-docker builder prune -f --filter "until=24h"
-docker system df
+.\scripts\rebuild.ps1
 ```
 
-Evite `docker system prune --volumes`, porque isso pode apagar dados do banco e modelos locais.
+## 🤝 Contributing
 
-Para diagnosticar GPU, Ollama, containers e espaço:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-```powershell
-.\scripts\status.ps1
-```
+1. Fork the project.
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a Pull Request.
 
-## Desenvolvimento backend sem Docker
+## 📝 License
 
-O backend sem Docker espera Postgres/PgBouncer em `localhost:6432` e Redis em `localhost:6379`.
-
-```powershell
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-## Testes e build
-
-```powershell
-python -m pytest -q
-npm --prefix frontend run build
-docker compose config --quiet
-```
-
-## Providers de IA
-
-O projeto também aceita Gemini, mas para uso local gratuito o fluxo recomendado é Ollama.
-
-```env
-DEFAULT_LLM_PROVIDER=gemini
-DEFAULT_EMBEDDING_PROVIDER=gemini
-GEMINI_API_KEY=sua_chave
-GEMINI_LLM_MODEL=gemini-3.5-flash
-GEMINI_EMBEDDING_MODEL=gemini-embedding-001
-```
+Distributed under the MIT License. See `LICENSE` for more information.

@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 
@@ -10,16 +11,40 @@ class SpeechUsage:
     estimated_cost_usd: float = 0
 
 
-class MockSttProvider:
+class SttProvider(ABC):
+    name: str
+    model: str
+
+    @abstractmethod
+    async def transcribe(self, audio_bytes: bytes, *, filename: str | None = None, content_type: str | None = None) -> tuple[str, SpeechUsage]:
+        raise NotImplementedError
+
+
+class TtsProvider(ABC):
+    name: str
+    model: str
+
+    @abstractmethod
+    async def synthesize(
+        self,
+        text: str,
+        voice: str | None = None,
+        model: str | None = None,
+        speed: float | None = None,
+    ) -> tuple[bytes, SpeechUsage]:
+        raise NotImplementedError
+
+
+class MockSttProvider(SttProvider):
     name = "mock"
     model = "mock-stt-001"
 
-    async def transcribe(self, audio_bytes: bytes) -> tuple[str, SpeechUsage]:
+    async def transcribe(self, audio_bytes: bytes, *, filename: str | None = None, content_type: str | None = None) -> tuple[str, SpeechUsage]:
         seconds = max(0.1, len(audio_bytes) / 32000)
         return "mock transcription", SpeechUsage(provider=self.name, model=self.model, audio_seconds=seconds)
 
 
-class MockTtsProvider:
+class MockTtsProvider(TtsProvider):
     name = "mock"
     model = "mock-tts-001"
 
