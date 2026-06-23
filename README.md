@@ -1,4 +1,4 @@
-# LinguaFlow AI 🗣️🤖
+# LinguaFlow AI
 
 ![LinguaFlow AI](https://img.shields.io/badge/Status-Active-brightgreen) ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg) ![Next.js](https://img.shields.io/badge/Next.js-14-black) ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg) ![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)
 
